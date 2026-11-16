@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.ci-venv/
+# Never commit decrypted secrets.
+secrets.json
+*.plain.json
+.claude/

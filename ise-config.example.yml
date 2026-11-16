@@ -1,0 +1,33 @@
+# Copy to ise-config.yml in a data repo. Credentials come from
+# ISE_USERNAME / ISE_PASSWORD, never from this file.
+
+# Primary PAN that export reads from.
+source_host: ise-pan.example.net
+
+# Optional SHA-256 pins for admin certificates not signed by a trusted CA.
+# Renewing the certificate breaks export until the pin is updated:
+#   echo | openssl s_client -connect HOST:443 2>/dev/null | openssl x509 -noout -fingerprint -sha256
+tls_fingerprints:
+  ise-pan.example.net: "AB:CD:..."
+
+# apply and ad-join refuse these (by name, address and reported node name).
+# List every production node.
+protected_hosts:
+  - ise-pan.example.net
+  - ise-psn.example.net
+
+# Endpoints: static (static group/profile assignments only), all, or none.
+endpoints: static
+
+# Shared secrets: inline (in each object's file) or gpg (encrypted to
+# secrets_public_key in config/secrets.json.gpg).
+secrets: inline
+secrets_public_key: keys/restore.asc
+
+# Parallel GETs during export. ERS throttles; keep this modest.
+workers: 8
+
+# check alarms when a collection shrinks by more than both of these.
+check:
+  max_drop_percent: 10
+  max_drop_objects: 5

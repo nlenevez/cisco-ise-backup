@@ -1,0 +1,4 @@
+# Copy to .gitignore in a data repo. Credentials never go in git:
+# ise-config reads them from the environment.
+*.env
+.env*

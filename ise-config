@@ -1,0 +1,13 @@
+#!/bin/sh
+# Run ise-config from wherever this checkout lives (e.g. a data repo's
+# tool/ submodule): settings and config/ resolve against the current
+# directory, the code and its vendored dependencies against this one.
+here=$(cd "$(dirname "$0")" && pwd)
+py=${PYTHON:-python3}
+# RHEL 8's python3 is 3.6: fail with a clear message, not a SyntaxError.
+if ! "$py" -c 'import sys; sys.exit(sys.version_info < (3, 8))' 2>/dev/null; then
+    echo "ise-config needs Python 3.8+; $py is $("$py" -V 2>&1 || echo missing)." >&2
+    echo "Point PYTHON at a newer one, e.g. PYTHON=/usr/bin/python3.12" >&2
+    exit 1
+fi
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$py" -B -m ise_config "$@"

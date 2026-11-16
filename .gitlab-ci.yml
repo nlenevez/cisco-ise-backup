@@ -1,0 +1,13 @@
+stages:
+  - lint
+
+lint:
+  stage: lint
+  tags: [network-jump]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+  script:
+    - python3 -B -c "import glob; [compile(open(f).read(), f, 'exec') for f in glob.glob('ise_config/*.py')]"
+    - ./ise-config --help > /dev/null
+    - sh -n contrib/nightly-export.sh
+    - sh -n scripts/make-airgap-bundle.sh
