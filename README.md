@@ -91,7 +91,8 @@ anywhere: `plan --host <PAN>` shows drift between git and the live cluster.
 3. Copy `tool/ise-config.example.yml` to `ise-config.yml` and
    `tool/contrib/data-repo/gitignore` to `.gitignore`; fill in the former.
 4. Run `tool/ise-config export` by hand, check `export-errors.json`, commit.
-5. Schedule `tool/contrib/nightly-export.sh` from cron
+5. Schedule it: cron running `tool/contrib/nightly-export.sh`, or the
+   Ansible playbook in `contrib/ansible/` with credentials in a vault
    ([docs/DEPLOY.md](docs/DEPLOY.md)).
 
 To update the tool in a data repo: `git -C tool pull origin main`, then
@@ -116,6 +117,6 @@ They are rebuilt by hand from [docs/MANUAL-SETTINGS.md](docs/MANUAL-SETTINGS.md)
 
 ## Docs
 
-- [docs/DEPLOY.md](docs/DEPLOY.md): install, cron, air-gapped sites
+- [docs/DEPLOY.md](docs/DEPLOY.md): install, cron or Ansible, air-gapped sites
 - [docs/RESTORE-SOP.md](docs/RESTORE-SOP.md): rebuilding a cluster
 - [docs/MANUAL-SETTINGS.md](docs/MANUAL-SETTINGS.md): what to rebuild by hand

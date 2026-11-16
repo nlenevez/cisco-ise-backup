@@ -1,0 +1,10 @@
+# Create the real file encrypted, never as plain text:
+#   ansible-vault create vault.yml
+# One entry per cluster name in ise_export_clusters; "default" covers the rest.
+vault_ise_credentials:
+  default:
+    username: ise-export
+    password: change-me
+  site-b:
+    username: ise-export-b
+    password: change-me-too

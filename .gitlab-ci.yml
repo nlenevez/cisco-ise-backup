@@ -11,3 +11,4 @@ lint:
     - ./ise-config --help > /dev/null
     - sh -n contrib/nightly-export.sh
     - sh -n scripts/make-airgap-bundle.sh
+    - sh -n scripts/publish-snapshot.sh

@@ -1,0 +1,18 @@
+# Copy to inventory.yml. The export host runs the play against itself.
+all:
+  children:
+    ise_export:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_python_interpreter: /usr/bin/python3.12
+      vars:
+        ise_export_python: /usr/bin/python3.12
+        ise_export_ssh_key: /home/ise-export/.ssh/ise_export
+        ise_export_clusters:
+          - name: site-a                      # key in vault_ise_credentials
+            path: /srv/ise/site-a
+            repo: ssh://git@bitbucket.example.net:7999/ise/site-a-config.git   # optional: cloned if missing
+          - name: site-b
+            path: /srv/ise/site-b
+            branch: master                    # optional, default main

@@ -1,0 +1,107 @@
+---
+# Export every ISE cluster in ise_export_clusters, credentials from a vault.
+#
+#   ansible-playbook -i inventory.yml ise-export.yml --vault-password-file ~/.ise-vault-pass
+#
+# Per cluster: clone the data repo if missing, then run
+# tool/contrib/nightly-export.sh (export, check, commit, push). Every cluster
+# is attempted; the play fails at the end if any reported ALARM or FAILED.
+- name: ISE configuration export
+  hosts: ise_export
+  gather_facts: false
+
+  vars_files:
+    - "{{ ise_export_vault_file | default(playbook_dir + '/vault.yml') }}"
+
+  # Defaults are inline (| default): play vars would override the inventory.
+  tasks:
+    - name: Credentials exist for every cluster
+      ansible.builtin.assert:
+        that:
+          - (vault_ise_credentials[item.name] | default(vault_ise_credentials.default | default({}))).username | default('') | length > 0
+          - (vault_ise_credentials[item.name] | default(vault_ise_credentials.default | default({}))).password | default('') | length > 0
+        fail_msg: "no vault_ise_credentials entry for {{ item.name }} (and no default)"
+        quiet: true
+      loop: "{{ ise_export_clusters }}"
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+
+    - name: Data repo is cloned
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        dest: "{{ item.path }}"
+        version: "{{ item.branch | default(ise_export_branch | default('main')) }}"
+        recursive: true
+        update: false
+        accept_hostkey: false
+        key_file: "{{ ise_export_ssh_key | default(omit, true) }}"
+      loop: "{{ ise_export_clusters | selectattr('repo', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # Credentials go to the script in a 0600 env file, not via `environment:`,
+    # which -vvv prints and `ps` shows.
+    - name: Export
+      block:
+        - name: Private directory for credential files
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: .ise-export
+          register: ise_export_tmp
+
+        - name: Credential file per cluster
+          ansible.builtin.copy:
+            dest: "{{ ise_export_tmp.path }}/{{ item.name }}.env"
+            mode: "0600"
+            content: |
+              ISE_USERNAME={{ cred.username | quote }}
+              ISE_PASSWORD={{ cred.password | quote }}
+          vars:
+            cred: "{{ vault_ise_credentials[item.name] | default(vault_ise_credentials.default) }}"
+          loop: "{{ ise_export_clusters }}"
+          loop_control:
+            label: "{{ item.name }}"
+          no_log: true
+
+        - name: Run export
+          ansible.builtin.command:
+            argv:
+              - "{{ item.path }}/tool/contrib/nightly-export.sh"
+              - "{{ ise_export_tmp.path }}/{{ item.name }}.env"
+            chdir: "{{ item.path }}"
+          environment:
+            PYTHON: "{{ item.python | default(ise_export_python | default('/usr/bin/python3')) }}"
+            EXPORT_BRANCH: "{{ item.branch | default(ise_export_branch | default('main')) }}"
+            EXPORT_REMOTE: "{{ item.remote | default(ise_export_remote | default('origin')) }}"
+            GIT_SSH_COMMAND: "ssh -o BatchMode=yes{{ (' -i ' + ise_export_ssh_key) if ise_export_ssh_key | default('') else '' }}"
+          loop: "{{ ise_export_clusters }}"
+          loop_control:
+            label: "{{ item.name }}"
+          register: ise_export_runs
+          failed_when: false
+          changed_when: "'committed ' in ise_export_runs.stdout | default('')"
+      always:
+        - name: Remove credential files
+          ansible.builtin.file:
+            path: "{{ ise_export_tmp.path }}"
+            state: absent
+          when: ise_export_tmp.path is defined
+
+    - name: Output
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines + item.stderr_lines }}"
+      loop: "{{ ise_export_runs.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ {0: 'ok', 2: 'ALARM'}[item.rc] | default('FAILED') }}"
+
+    - name: All clusters exported cleanly
+      ansible.builtin.assert:
+        that: bad | length == 0
+        fail_msg: "{{ bad | join(', ') }}"
+        success_msg: "all {{ ise_export_runs.results | length }} cluster(s) ok"
+      vars:
+        bad: >-
+          {{ ise_export_runs.results | rejectattr('rc', 'equalto', 0)
+             | map(attribute='item.name') | zip(ise_export_runs.results | rejectattr('rc', 'equalto', 0)
+             | map(attribute='rc') | map('string')) | map('join', ': exit ') | list }}
