@@ -80,6 +80,28 @@ tool/ise-config apply --host NEW --stage policy --prune --yes
 tool/ise-config verify --host NEW      # export NEW and diff with config/
 ```
 
+### MAB audit
+
+```sh
+tool/ise-config mab-audit -o mab.csv          # active MAB sessions
+tool/ise-config mab-audit --all -o all.csv    # every session, with is_mab
+```
+
+Read-only, from the MnT REST API: lists active sessions, reads each one's
+detail, and keeps those that authenticated by MAB (method `mab` or
+protocol `Lookup`). One CSV row per endpoint: switch, port, IP, identity
+group, endpoint profile, authorization profile, PSN, time, and from the
+endpoint database whether it has a static group assignment. The summary
+counts MAB endpoints with no static assignment: devices let in by
+profiling or a default rule rather than an allow-list.
+
+- The account needs **MnT Admin** (or Super Admin) and, for the static
+  assignment columns, ERS read. Without ERS those columns stay empty.
+- Point `--host` (or `mnt_host` in `ise-config.yml`) at the primary MnT
+  node.
+- Active sessions only. For history, use the RADIUS Authentications
+  report filtered on Authentication Method = mab.
+
 `apply` and `ad-join` refuse any host in `protected_hosts`, matched by
 name, address and the node names the target reports. `plan` runs
 anywhere: `plan --host <PAN>` shows drift between git and the live cluster.

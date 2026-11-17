@@ -6,6 +6,7 @@
   apply    rebuild a target from config/ (refuses protected hosts)
   ad-join  join a rebuilt AD join point to its domain
   verify   export the target to a temp dir and diff it against config/
+  mab-audit  list active sessions that authenticated by MAB (read-only, MnT)
 
 Credentials come from ISE_USERNAME / ISE_PASSWORD, or are prompted for.
 """
@@ -186,6 +187,37 @@ def cmd_verify(args, settings):
     return 1 if rc else 0
 
 
+def cmd_mab_audit(args, settings):
+    from .sessions import SessionAudit, summary, write_csv
+    host = args.host or settings.get("mnt_host") or settings.get("source_host")
+    if not host:
+        raise SystemExit("no MnT host: pass --host or set mnt_host")
+    c = client_for(args, host, settings)
+    audit = SessionAudit(c, workers=settings.get("workers", 8), log=log)
+    try:
+        sessions, rows = audit.run(include_all=args.all, endpoints=not args.no_endpoints)
+    except ISEError as e:
+        if e.status == 401:
+            raise SystemExit(f"{host}: HTTP 401 from the MnT API; the account needs MnT Admin "
+                             "(or Super Admin), and the host must be an MnT node")
+        raise
+    if args.output == "-":
+        write_csv(rows, sys.stdout, include_all=args.all)
+    else:
+        with open(args.output, "w", newline="") as f:
+            write_csv(rows, f, include_all=args.all)
+        log(f"{len(rows)} row(s) written to {args.output}")
+    for line in summary(sessions, rows):
+        log(line)
+    if audit.ended:
+        log(f"{audit.ended} session(s) ended before their detail could be read")
+    for e in audit.errors[:20]:
+        log(f"error: {e}")
+    if len(audit.errors) > 20:
+        log(f"... {len(audit.errors) - 20} more error(s)")
+    return 1 if audit.errors else 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="ise-config")
     p.add_argument("--settings", default="ise-config.yml")
@@ -221,6 +253,14 @@ def main(argv=None):
     s = sub.add_parser("verify")
     s.add_argument("--host", required=True)
 
+    s = sub.add_parser("mab-audit")
+    s.add_argument("--host", help="MnT node (default: mnt_host, then source_host)")
+    s.add_argument("--output", "-o", default="-", help="CSV file (default: stdout)")
+    s.add_argument("--all", action="store_true",
+                   help="include every session, with an is_mab column")
+    s.add_argument("--no-endpoints", action="store_true",
+                   help="skip the endpoint database lookup (static group/profile)")
+
     args = p.parse_args(argv)
     settings = load_settings(args.settings)
     try:
@@ -244,6 +284,8 @@ def dispatch(args, settings):
         return cmd_ad_join(args, settings)
     if args.cmd == "verify":
         return cmd_verify(args, settings)
+    if args.cmd == "mab-audit":
+        return cmd_mab_audit(args, settings)
 
 
 if __name__ == "__main__":

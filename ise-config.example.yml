@@ -4,6 +4,9 @@
 # Primary PAN that export reads from.
 source_host: ise-pan.example.net
 
+# MnT node for mab-audit, if not the source_host.
+# mnt_host: ise-mnt.example.net
+
 # Optional SHA-256 pins for admin certificates not signed by a trusted CA.
 # Renewing the certificate breaks export until the pin is updated:
 #   echo | openssl s_client -connect HOST:443 2>/dev/null | openssl x509 -noout -fingerprint -sha256
